@@ -1,0 +1,63 @@
+import os
+from collections import OrderedDict
+
+import matplotlib.pyplot as plt
+from google import genai
+import dotenv
+
+
+GENETIC_CODE = {
+    "uuu": "Phe", "uuc": "Phe", "uua": "Leu", "uug": "Leu",
+    "cuu": "Leu", "cuc": "Leu", "cua": "Leu", "cug": "Leu",
+    "auu": "Ile", "auc": "Ile", "aua": "Ile", "aug": "Met",
+    "guu": "Val", "guc": "Val", "gua": "Val", "gug": "Val",
+    "ucu": "Ser", "ucc": "Ser", "uca": "Ser", "ucg": "Ser",
+    "ccu": "Pro", "ccc": "Pro", "cca": "Pro", "ccg": "Pro",
+    "acu": "Thr", "acc": "Thr", "aca": "Thr", "acg": "Thr",
+    "gcu": "Ala", "gcc": "Ala", "gca": "Ala", "gcg": "Ala",
+    "uau": "Tyr", "uac": "Tyr", "uaa": "Stop", "uag": "Stop",
+    "cau": "His", "cac": "His", "caa": "Gln", "cag": "Gln",
+    "aau": "Asn", "aac": "Asn", "aaa": "Lys", "aag": "Lys",
+    "gau": "Asp", "gac": "Asp", "gaa": "Glu", "gag": "Glu",
+    "ugu": "Cys", "ugc": "Cys", "uga": "Stop", "ugg": "Trp",
+    "cgu": "Arg", "cgc": "Arg", "cga": "Arg", "cgg": "Arg",
+    "agu": "Ser", "agc": "Ser", "aga": "Arg", "agg": "Arg",
+    "ggu": "Gly", "ggc": "Gly", "gga": "Gly", "ggg": "Gly",
+}
+
+
+def codon_to_aminoacid(codon):
+    codon = codon.lower().replace("t", "u")
+    return GENETIC_CODE.get(codon)
+
+# Rhinovirus B14, complete genome
+genome="ttaaaacagcggatgggtatcccaccattcgacccattgggtgtagtactctggtactatgtacctttgtacgcctgtttctccccaaccacccttccttaaaattcccacccatgaaacgttagaagcttgacattaaagtacaataggtggcgccatatccaatggtgtctatgtacaagcacttctgtttcccaggagcgaggtataggctgtacccactgccaaaagcctttaaccgttatccgccaaccaactacgtaacagttagtaccatcttgttcttgactggacgttcgatcaggtggattttccctccactagtttggtcgatgaggctaggaattccccacgggtgaccgtgtcctagcctgcgtggcggccaacccagcttatgctgggacgcccttttaaggacatggtgtgaagactcgcatgtgcttggttgtgagtcctccggcccctgaatgcggctaaccttaaccctagagccttatgccacgatccagtggttgtaaggtcgtaatgagcaattccgggacgggaccgactactttgggtgtccgtgtttctcatttttcttcatattgtcttatggtcacagcatatatatacatatactgtgatcatgggcgctcaggtttctacacagaaaagtggatctcacgaaaatcaaaacattttgaccaatggatcaaatcagactttcacagttataaattactataaggatgcagcaagtacatcatcagctggtcaatcactgtcaatggacccatctaagtttacagaaccagttaaagatctcatgcttaagggtgcaccagcattgaattcacccaatgttgaggcctgtggttatagtgatagagtacaacaaatcacactcgggaattcaacaataacaacacaagaagcagccaacgctgttgtgtgttatgctgaatggccagagtaccttccagatgtggacgctagtgatgtcaataaaacttcaaaaccagacacttctgtctgtaggttttacacattggatagtaagacatggacaacaggttctaaaggctggtgctggaaattaccagatgcactcaaggatatgggtgtgttcgggcaaaacatgtttttccactcactaggaagatcaggttacacagtacacgttcagtgcaatgccacaaaattccatagcggttgtctacttgtagttgtaataccagaacaccaactggcttcacatgagggtggcaatgtttcagttaaatacacattcacgcatccaggtgaacgtggtatagatttatcatctgcaaatgaagtgggagggcctgtcaaggatgtcatatacaatatgaatggtactttattaggaaatctgctcattttccctcaccagttcattaatctaagaaccaataatacagccacaatagtgataccatacataaactcagtacccattgattcaatgacacgtcacaacaatgtctcactgatggtcatccctattgcccctcttacagtaccaactggagcaactccctcactccctataacagtcacaatagcacctatgtgcactgagttctctgggataaggtccaagtcaattgtgccacaaggtttgccaactacaactttgccggggtcaggacaattcttgaccacagatgacaggcaatcccccagtgcactgccaaattatgagccaactccaagaatacacatactagggaaagttcataacttgctagaaattatacaggtagatacactcattcctatgaacaacacgcatacaaaagatgaggttaacagttacctcataccactaaatgcaaacaggcaaaatgagcaggtttttgggacaaacctgtttattggtgatggggtcttcaaaactactcttctgggtgaaattgttcagtactatacacattggtctggatcacttagattctcttcgatgtatactggtcctgccttgtccagtgctaaactcactctagcatacaccccgcctggtgctcgtggtccacaggacaggagagaagcaatgctaggtactcatgttgtctgggatattggtctgcaatccaccatagtaatgacaataccatggacatcaggggtgcagtttagatatactgatccagatacatacaccagtgctggctttctatcatgttggtatcaaacttctcttatacttcccccagaaacgaccggccaggtctacttattatcattcataagtgcatgtccagattttaagcttaggctgatgaaagatactcaaactatctcacagactgttgcactcactgaaggcttaggtgatgaattagaagaagtcatcgttgagaaaacgaaacagacggtggcctcaatctcatctggtccaaaacacacacaaaaagtccccatactaactgcaaacgaaacaggggccacaatgcctgttcttccatcagacagcatagaaaccagaactacctacatgcactttaatggttcagaaactgatgtagaatgctttttgggtcgtgcagcttgtgtgcatgtaactgaaatacaaaacaaagatgctactggaatagataatcacagagaagcaaaattgttcaatgattggaaaatcaacctgtccagccttgtccaacttagaaagaaactggaactcttcacttatgttaggtttgattctgagtataccatactggccactgcatctcaacctgattcagcaaactattcaagcaatttggtggtccaagccatgtatgttccacatggtgccccgaaatccaaaagagtgggcgattacacatggcaaagtgcttcaaaccccagtgtattcttcaaggtgggggatacatcaaggtttagtgtgccttatgtaggattggcatcagcatataattgtttttatgatggttactcacatgatgatgcagaaactcagtatggcataactgttctaaaccatatgggtagtatggcattcagaatagtaaatgaacatgatgaacacaaaactcttgtcaagatcagagtttatcacagggcaaagctcgttgaagcatggattccaagagcacccagagcactaccctacacatcaatagggcgcacaaattatcctaagaatacagaaccagtaattaagaagaggaaaggtgacattaaatcctatggtttaggacctaggtacggtgggatttatacatcaaatgttaaaataatgaattaccacttgatgacaccagaagaccaccataatctgatagcaccctatccaaatagagatttagcaatagtctcaacaggaggacatggtgcagaaacaataccacactgtaaccgtacatcaggtgtttactattccacatattacagaaagtattaccccataatttgcgaaaagcccaccaacatctggattgaaggaagcccttattacccaagtagatttcaagcaggagtgatgaaaggggttgggccggcagagctaggagactgcggtgggattttgagatgcatacatggtcccattggattgttaacagctgaaggtagtggatatgtttgttttgctgacatacgacagttggagtgtatcgcagaggaacaggggctgagtgattacatcacaggtttgggtagagcttttggtgtcgggttcactgaccaaatctcaacaaaagtcacagaactacaagaagtggcgaaagatttcctcaccacaaaagttttgtccaaagtggtcaaaatggtttcagctttagtgatcatttgcagaaatcatgatgacttggtcactgttacggccactctagcactacttggatgtgatggatctccttggagatttctgaagatgtacatttccaaacactttcaggtgccttacattgaaagacaagcaaatgatggatggttcagaaagtttaatgatgcatgtaatgctgcaaagggattggaatggattgctaataagatttccaaactgattgaatggataaaaaacaaagtacttccccaagccaaagaaaaactagaattttgtagtaaactcaaacaacttgatatactagagagacaaataaccaccatgcatatctcgaatccaacacaggaaaaacgagagcagttgttcaataacgtattgtggttggaacaaatgtcgcaaaagtttgccccattttatgccgttgaatcaaaaagaatcagggaactcaagaacaaaatggtaaattatatgcaatttaaaagtaaacaaagaactgaaccagtgtgtgtattaatccatggtacacccggttctggtaaatcattaacaacatccattgtgggacgtgcaattgcagaacacttcaattcagcagtatattcacttccaccagatcccaagcactttgatggttatcagcaacaggaagttgtgattatggatgatctgaaccaaaatccagatggacaggatataagcatgttttgtcaaatggtttcttcagtggatttcttgcctccaatggctagtttagataacaagggcatgttattcaccagtaattttgttctagcctccacaaattctaacacactaagccccccaacaatcttgaatcctgaagctttagtcaggagatttggttttgacctagatatatgtttgcatactacctacacaaagaatggaaaactcaatgcaggcatgtcaaccaagacatgcaaagattgccatcaaccatctaatttcaagaaatgttgccccctagtctgtggaaaagctattagcttggtagacagaactaccaacgttaggtatagtgtggatcaactggtcacggctattataagtgatttcaagagcaaaatgcaaattacagattccctagaaacactgtttcaaggaccagtgtataaagatttagagattgatgtttgcaacacaccaccttcagaatgtatcaacgatttactgaaatctgtagattcagaagagattagggaatattgtaagaagaagaaatggattatacctgaaattcctaccaacatagaaagggctatgaatcaagccagcatgattattaatactattctgatgtttgtcagtacattaggtattgtttatgtcatttataaattgtttgctcaaactcaaggaccatattctggtaacccgcctcacaataaactaaaagccccaactttacgcccagttgttgtgcaaggaccaaacacagaatttgcactatccctgttaaggaaaaacataatgactataacaacctcaaagggagagttcacagggttaggcatacatgatcgtgtctgtgtgatacccacacacgcacagcctggtgatgatgtactagtgaatggtcagaaaattagagttaaggataagtacaaattagtagatccagagaacattaatctagagcttacagtgttgactttagatagaaatgaaaaattcagagatatcaggggatttatatcagaagatctagaaggtgtggatgccactttggtagtacattcaaataactttaccaacactatcttagaagttggccctgtaacaatggcaggacttattaatttgagtagcacccccactaacagaatgattcgttatgattatgcaacaaaaactgggcagtgtggaggtgtgctgtgtgctactggtaagatctttggtattcatgttggcggtaatggaagacaaggattttcagctcaacttaaaaaacaatattttgtagagaaacaaggccaagtaatagctagacataaggttagggagtttaacataaatccagtcaacacggcaactaagtcaaaattacatcccagtgtattttatgatgtttttccaggtgacaaggaacctgctgtattgagtgacaatgatcccagactggaagttaaattgactgaatcattattctctaagtacaaggggaatgtaaatacggaacccactgaaaatatgcttgtggctgtagaccattatgcagggcaactattatcactagatatccccacttctgaacttacactaaaagaagcattatatggagtagatggactagaacctatagatattacaaccagtgcaggatttccctatgtgagtcttgggatcaaaaagagagacattctgaataaagagacccaggacacagaaaagatgaagttttatctagacaagtatggcattgacttgcctctagttacatatattaaggatgaattaagaagtgttgacaaagtccgattagggaaaagtagattaattgaagcctccagtttgaatgattctgttaacatgagaatgaaactaggcaacctttacaaagcattccatcaaaatcccggtgttctgactggatcagcagtgggttgtgatcctgatgtgttttggtctgtcatcccttgcttaatggatgggcacctgatggcatttgattactctaattttgatgcctctttgtcaccagtttggtttgtctgtctagagaaggttttgaccaagttaggctttgcaggctcttcattaattcaatcaatttgtaatacccatcatatctttagggatgaaatatatgtggttgaaggtggcatgccctcagggtgttcaggaaccagcatattcaattccatgatcaacaacataatcattaggactttgatattagatgcatataaaggaatagatttagacaaacttaaaatcttagcttacggtgatgatttgattgtttcttatccttatgaactggatccacaagtgttggcaactcttggtaaaaattatggactaaccatcacacccccagacaaatctgaaacttttacaaaaatgacatgggaaaacttgacatttttaaagagatacttcaagcctgatcaacaatttccctttttggttcacccagttatgcccatgaaagatatacatgagtcaatcagatggacaaaggatcctaaaaacacacaggatcacgtccgatcattatgcatgttagcatggcactcaggagaaaaagagtacaatgaattcattcagaagatcagaactactgacattggaaaatgtctaattctcccagaatacagcgtacttaggaggcgctggttggacctcttttaggttaacaatatagacacttaatttgagtagaagtaggagtttat"
+
+list={}
+start=0
+
+while start + 3 <= len(genome):
+    aminoacid = codon_to_aminoacid(genome[start:start+3])
+    list[aminoacid] = list.get(aminoacid, 0) + 1
+    start += 1
+
+res = OrderedDict(sorted(list.items(), key=lambda item: item[1],reverse=True)[:10])
+print(res)
+
+plt.bar(res.keys(),res.values())
+plt.show()
+
+prompt="""For these aminoacids, which are the foods and aliments that will contain them. 
+Provide a healthy diet plan that minimizes the aminoacid intake in the order they are provided.
+The aminoacids in order: """
+
+
+print(prompt+str(res))
+dotenv.load_dotenv()
+client = genai.Client(api_key=os.getenv("API_KEY"))
+interaction = client.interactions.create(
+    model="gemini-3.8-flash",
+    input=prompt+", ".join(res.keys())
+)
+print(interaction.output_text)
+ 
